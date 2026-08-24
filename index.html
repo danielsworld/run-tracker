@@ -1,0 +1,1002 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+<title>Sub-18 · 5K</title>
+<meta name="theme-color" content="#0D1012" />
+<!-- iOS: launch fullscreen from the Home Screen, no Safari chrome -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Sub-18" />
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Crect width='180' height='180' fill='%230D1012'/%3E%3Ctext x='90' y='104' font-family='-apple-system,Arial' font-size='58' font-weight='700' fill='%236C9CF0' text-anchor='middle'%3E18%3C/text%3E%3Ctext x='90' y='140' font-family='-apple-system,Arial' font-size='22' font-weight='600' fill='%238B949B' text-anchor='middle'%3ESUB%3C/text%3E%3C/svg%3E" />
+<style>
+  html,body{margin:0;padding:0;background:#0D1012;height:100%}
+  #root{height:100%}
+  .boot{display:flex;align-items:center;justify-content:center;height:100vh;color:#71797F;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:15px}
+</style>
+</head>
+<body>
+<div id="root"><div class="boot">Loading…</div></div>
+
+<!-- React + Babel from CDN. First open needs a connection; Safari then caches
+     these, so later opens (including offline at the track) work from cache. -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone@7.25.6/babel.min.js" crossorigin></script>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useMemo, useCallback, useRef } = React;
+
+/* ═══════════════ PLAN ═══════════════ */
+const RACE = "2026-10-03";
+
+const PLAN = [
+  { d: "2026-08-24", w: 1, ty: "easy", mi: 4, t: "Easy + strides", s: "4 mi @ 7:45–8:15 · 4×20sec strides" },
+  { d: "2026-08-25", w: 1, ty: "threshold", mi: 5.5, t: "Threshold", s: "2×10 min @ 6:10–6:15 · 2 min jog", lift: "A" },
+  { d: "2026-08-26", w: 1, ty: "easy", mi: 3, t: "Easy + core", s: "3 mi easy", core: true },
+  { d: "2026-08-27", w: 1, ty: "vo2", mi: 6, t: "VO2max", s: "6×800m @ 2:52–2:56 · 2 min jog", lift: "B" },
+  { d: "2026-08-28", w: 1, ty: "easy", mi: 3, t: "Easy + core", s: "3 mi easy", core: true },
+  { d: "2026-08-29", w: 1, ty: "long", mi: 8, t: "Long run", s: "8 mi @ 7:30–8:00" },
+  { d: "2026-08-30", w: 1, ty: "rest", mi: 0, t: "Rest", s: "Sunday" },
+
+  { d: "2026-08-31", w: 2, ty: "easy", mi: 5, t: "Easy + strides", s: "5 mi easy · 4×20sec strides" },
+  { d: "2026-09-01", w: 2, ty: "threshold", mi: 6, t: "Threshold", s: "3×8 min @ 6:08–6:13 · 90sec jog", lift: "A" },
+  { d: "2026-09-02", w: 2, ty: "easy", mi: 4.5, t: "Easy + core", s: "4.5 mi easy", core: true },
+  { d: "2026-09-03", w: 2, ty: "vo2", mi: 6.5, t: "VO2max", s: "5×1000m @ 3:31–3:35 · 2:30 jog", lift: "B" },
+  { d: "2026-09-04", w: 2, ty: "easy", mi: 3, t: "Easy + core", s: "3 mi easy", core: true },
+  { d: "2026-09-05", w: 2, ty: "long", mi: 9, t: "Long run", s: "9 mi @ 7:30–8:00" },
+  { d: "2026-09-06", w: 2, ty: "rest", mi: 0, t: "Rest", s: "Sunday" },
+
+  { d: "2026-09-07", w: 3, ty: "easy", mi: 5, t: "Easy + strides", s: "5 mi easy · 4×20sec strides" },
+  { d: "2026-09-08", w: 3, ty: "threshold", mi: 7.5, t: "Threshold — peak", s: "3×10 min @ 6:05–6:12 · 90sec jog", lift: "A" },
+  { d: "2026-09-09", w: 3, ty: "easy", mi: 5, t: "Easy + core", s: "5 mi easy", core: true },
+  { d: "2026-09-10", w: 3, ty: "vo2", mi: 7, t: "Mile repeats", s: "4×1 mile @ 5:28–5:36 · 3 min jog", lift: "B" },
+  { d: "2026-09-11", w: 3, ty: "easy", mi: 3.5, t: "Easy + core", s: "3.5 mi easy", core: true },
+  { d: "2026-09-12", w: 3, ty: "long", mi: 10, t: "Long run", s: "10 mi @ 7:30–8:00" },
+  { d: "2026-09-13", w: 3, ty: "rest", mi: 0, t: "Rest", s: "Sunday" },
+
+  { d: "2026-09-14", w: 4, ty: "easy", mi: 4, t: "Easy + strides", s: "4 mi easy · 4×20sec strides" },
+  { d: "2026-09-15", w: 4, ty: "threshold", mi: 5.5, t: "Threshold", s: "2×10 min @ 6:10–6:15 · 2 min jog", lift: "A", ln: "2 sets on everything. Keep the Nordics." },
+  { d: "2026-09-16", w: 4, ty: "easy", mi: 3, t: "Easy + core", s: "3 mi easy", core: true },
+  { d: "2026-09-17", w: 4, ty: "speed", mi: 4, t: "Sharpening", s: "6×200m @ 0:38–0:41 · full recovery", lift: "B", ln: "Plyos and calves only." },
+  { d: "2026-09-18", w: 4, ty: "easy", mi: 2.5, t: "Shakeout", s: "2–3 mi easy · 4 strides" },
+  { d: "2026-09-19", w: 4, ty: "tuneup", mi: 7, t: "Tune-up race", s: "5K or mile, run it hard" },
+  { d: "2026-09-20", w: 4, ty: "rest", mi: 0, t: "Rest", s: "Sunday" },
+
+  { d: "2026-09-21", w: 5, ty: "easy", mi: 3.5, t: "Recovery easy", s: "3–4 mi very easy" },
+  { d: "2026-09-22", w: 5, ty: "racepace", mi: 6.5, t: "Race-pace reps", s: "4×1000m @ 3:34–3:36 · 90sec jog", lift: "A", ln: "Last strength session. 2 sets, no plyos." },
+  { d: "2026-09-23", w: 5, ty: "easy", mi: 3.5, t: "Easy + core", s: "3–4 mi easy", core: true },
+  { d: "2026-09-24", w: 5, ty: "speed", mi: 5, t: "Sharpening", s: "5×400m @ 1:22–1:25 · 2 min jog" },
+  { d: "2026-09-25", w: 5, ty: "easy", mi: 3, t: "Easy + core", s: "3 mi easy", core: true },
+  { d: "2026-09-26", w: 5, ty: "long", mi: 6.5, t: "Long run", s: "6–7 mi @ 7:30–8:00" },
+  { d: "2026-09-27", w: 5, ty: "rest", mi: 0, t: "Rest", s: "Sunday" },
+
+  { d: "2026-09-28", w: 6, ty: "easy", mi: 3.5, t: "Easy + strides", s: "3–4 mi easy · 4×20sec strides", core: true },
+  { d: "2026-09-29", w: 6, ty: "speed", mi: 4, t: "Short & crisp", s: "4×400m @ 1:23–1:26 · full recovery" },
+  { d: "2026-09-30", w: 6, ty: "easy", mi: 2.5, t: "Easy or rest", s: "2–3 mi easy · mobility" },
+  { d: "2026-10-01", w: 6, ty: "easy", mi: 2.5, t: "Very easy", s: "2–3 mi · 3–4 strides" },
+  { d: "2026-10-02", w: 6, ty: "easy", mi: 1.5, t: "Shakeout", s: "1–2 mi + strides · sleep, hydrate" },
+  { d: "2026-10-03", w: 6, ty: "race", mi: 6.5, t: "Race day", s: "5K · 5:44–5:47/mi · sub-18:00" },
+];
+
+const WEEKS = { 1: "Reload", 2: "Build", 3: "Peak", 4: "Sharpen & test", 5: "Race-pace", 6: "Taper & race" };
+const QUALITY = new Set(["threshold", "vo2", "speed", "racepace", "tuneup", "race"]);
+const LABEL = { easy: "Easy", threshold: "Threshold", vo2: "VO2max", speed: "Speed", racepace: "Race pace", long: "Long", rest: "Rest", tuneup: "Tune-up", race: "Race day" };
+const TIER = { rest: "#646C73", easy: "#48B87E", long: "#3BA8A8", threshold: "#E0A93E", vo2: "#E4544B", speed: "#E4544B", racepace: "#E4544B", tuneup: "#8B79E0", race: "#A98CFF" };
+
+/* ═══════════════ EXERCISES ═══════════════ */
+const ex = (m, dose, cue, q) => ({ m, dose, cue, q: (q || m) + " form" });
+const KIT = "Pull-up bar · med ball · foam roller · chair · step";
+
+const PRINCIPLES = [
+  "Strength goes on hard running days, after the run. Easy days stay easy.",
+  "No weights means load comes from: one leg, slower tempo, deeper range, more elevation. Work down that list before adding reps.",
+  "Plyos carry more weight here than in a barbell program — and they're the most transferable part anyway. Quiet landings or the set is over.",
+  "Leave 2 reps in reserve. You're producing force, not failing.",
+  "Loaded backpack is a legit progression once bodyweight gets easy. Split squats and step-ups first.",
+  "Never the day before a workout or long run.",
+];
+
+const WARM = {
+  name: "Warm-up", note: "5 min",
+  items: [
+    ex("Leg swings, front/back + side/side", "10 each way", "Build range, don't force it", "leg swings runners"),
+    ex("Glute bridge", "12", "Squeeze at the top, ribs down", "glute bridge"),
+    ex("Walking lunge with rotation", "8 / leg", "Long step, tall chest", "walking lunge with rotation"),
+    ex("A-skips", "2×20m", "Quick contact, foot lands under the hip", "a skip drill running"),
+  ],
+};
+
+const LIFTS = {
+  A: {
+    title: "Session A — Force", focus: "Max force & posterior chain", when: "Tue, after the threshold run", mins: "35 min",
+    blocks: [
+      WARM,
+      { name: "Plyo primer", note: "First, while fresh. Walk back between sets.", items: [
+        ex("Pogo hops", "2×20", "Ankles only, stiff knees, minimal ground time. Trains Achilles stiffness — the most running-specific thing here", "pogo hops plyometric"),
+        ex("Broad jump", "3×4", "Max intent, stick the landing. Four honest reps beat twenty sloppy ones", "standing broad jump"),
+      ]},
+      { name: "Main work", note: "Rest 2 min. Med ball at your chest for the squat patterns.", items: [
+        ex("Nordic hamstring curl", "3×5", "Heels hooked under a couch. Lower as slowly as you can, catch with your hands. Strongest evidence base in sports medicine for hamstring injury prevention", "nordic hamstring curl at home"),
+        ex("Bulgarian split squat, rear foot on a chair", "3×8 / leg", "3 sec down. Slight forward lean loads the glute, not the knee", "bulgarian split squat"),
+        ex("Single-leg Romanian deadlift", "3×8 / leg", "Hips square — the standing hip shouldn't rotate open", "single leg romanian deadlift"),
+        ex("Step-up onto a chair", "3×8 / leg", "No push off the back leg. Control the way down", "step up exercise"),
+      ]},
+      { name: "Lower leg & hip", note: "The part runners skip and then get hurt.", items: [
+        ex("Single-leg bent-knee calf raise", "3×15 / leg", "Knee bent 30°, off a step, 3 sec down. Your soleus takes several times bodyweight per stride and is almost always undertrained", "seated soleus calf raise"),
+        ex("Single-leg straight-leg calf raise", "3×12 / leg", "Full range, pause at the top", "single leg calf raise step"),
+        ex("Copenhagen plank", "2×20–30 sec / side", "Start knee-on-chair. Adductor strength is cheap insurance against groin and hip issues", "copenhagen plank progression"),
+      ]},
+      { name: "Optional finisher", note: "", items: [
+        ex("Pull-ups", "3×5", "Full hang at the bottom. Won't make you faster, but holds your posture together at 4K", "pull up form"),
+      ]},
+    ],
+  },
+  B: {
+    title: "Session B — Elastic", focus: "Speed-strength & lateral stability", when: "Thu, after the intervals", mins: "30 min",
+    blocks: [
+      WARM,
+      { name: "Plyo block", note: "Full weeks 1–3 · pogos + hops only week 4 · none from week 5.", items: [
+        ex("Pogo hops", "2×20", "Quiet, quick, stiff ankles", "pogo hops plyometric"),
+        ex("Single-leg hops in place", "3×8 / leg", "Land under the hip. Loud landing ends the set", "single leg hops plyometric"),
+        ex("Lateral bound", "3×6 / side", "Stick each landing a full second. Running is more lateral than it looks", "lateral bound skater jump"),
+        ex("Bounding", "3×20m", "Exaggerated stride, drive the knee, walk back", "bounding drill runners"),
+      ]},
+      { name: "Main work", note: "Rest 90 sec.", items: [
+        ex("Split-squat jump", "3×6 / leg", "Land soft, switch in the air. Control beats height", "split squat jump"),
+        ex("Med ball slam", "3×8", "Full overhead extension, drive it down. Trunk, not arms", "medicine ball slam"),
+        ex("Med ball rotational throw into a wall", "3×8 / side", "Rotate through the hips. Closest thing to what your trunk does at 5:45 pace", "medicine ball rotational throw"),
+        ex("Step-down from a chair", "3×8 / leg", "Slow lower until the heel taps. Eccentric knee control for hills", "step down exercise eccentric"),
+        ex("Single-leg glute bridge, foot on a chair", "3×12 / leg", "2 sec pause up top, no arching", "single leg hip thrust bench"),
+      ]},
+      { name: "Lower leg & hip", note: "", items: [
+        ex("Eccentric calf raise off a step", "3×10 / leg", "Up on two, down on one over 4 sec. Best-evidenced Achilles protocol there is", "eccentric heel drop achilles"),
+        ex("Side plank with top-leg lift", "2×10 / side", "Hips stacked, lift from the glute", "side plank hip abduction"),
+        ex("Hanging knee raise", "3×8", "No swing. If you're swinging, the abs aren't working", "hanging knee raise"),
+      ]},
+    ],
+  },
+};
+
+const CORE = {
+  title: "Core circuit", focus: "Anti-rotation & anti-extension", when: "Wed + Fri, after the easy run", mins: "10–12 min · 2 rounds",
+  note: "Resist movement, don't create it. Your trunk's job at 5:45 pace is to stay quiet so leg force goes into the ground instead of into rotation. Stop when form breaks, not when the clock ends.",
+  items: [
+    ex("Front plank", "45 sec", "Glutes squeezed, pelvis tucked. A sagging plank trains nothing", "front plank form"),
+    ex("Side plank", "30 sec / side", "Hips stacked and lifted", "side plank form"),
+    ex("Dead bug, med ball overhead", "8 / side", "Low back stays flat. 3 sec out, 3 back", "dead bug exercise"),
+    ex("Bird dog", "8 / side", "2 sec pause fully extended", "bird dog exercise"),
+    ex("Med ball offset carry", "30 sec / side", "Don't lean — resisting the lean is the exercise", "suitcase carry"),
+    ex("Hollow hold", "20–30 sec", "Low back flat. Bend the knees to regress", "hollow body hold"),
+  ],
+};
+
+const MOB = {
+  post: {
+    title: "After every run", mins: "7–8 min",
+    note: "Rolling and stretching reliably improve range of motion short-term. The evidence they prevent injury is weak. Cheap and low-risk, so worth doing — but your load management is what actually keeps you healthy. Hold 30 sec, breathe, don't bounce.",
+    items: [
+      ex("Foam roll calves", "60 sec / leg", "Slow passes, pause on tender spots", "foam roll calves"),
+      ex("Foam roll quads", "60 sec / leg", "Hip to just above the knee", "foam roll quads"),
+      ex("Foam roll glutes", "45 sec / side", "Ankle over opposite knee, lean into it", "foam roll glutes piriformis"),
+      ex("Thoracic extension over the roller", "60 sec", "Roller across mid-back, extend back over it", "thoracic extension foam roller"),
+      ex("Couch stretch", "45 sec / side", "Squeeze the glute and tuck the pelvis — that's what makes it work", "couch stretch hip flexor"),
+      ex("Knee-to-wall ankle mobilization", "10 / side", "Knee over toes, heel down. Limited dorsiflexion shifts load onto the calf", "knee to wall ankle mobility"),
+      ex("Calf stretch, straight then bent knee", "30 sec each", "Straight hits gastroc, bent hits soleus. Need both", "standing calf stretch wall"),
+      ex("Figure-4 glute stretch", "30 sec / side", "On your back, pull the thigh in", "figure four glute stretch"),
+    ],
+  },
+  pre: {
+    title: "Before workouts", mins: "8–10 min after the jog",
+    note: "Dynamic only. Static stretching before hard running doesn't lower injury risk and can briefly blunt force output — save it for after.",
+    items: [
+      ex("Easy jog", "10–15 min", "Genuinely easy. This is most of the warm-up", "easy jog warm up"),
+      ex("Leg swings", "10 each way", "Build range gradually", "leg swings dynamic warm up"),
+      ex("Walking lunge with rotation", "8 / leg", "Opens the hip while it's warm", "walking lunge with rotation"),
+      ex("A-skips + high knees", "2×20m each", "Wakes up the elastic stuff", "a skips high knees drills"),
+      ex("Strides", "4×20 sec", "Build to race pace, full recovery. Never skip these", "running strides technique"),
+    ],
+  },
+};
+
+/* ═══════════════ UTILS ═══════════════ */
+const pad = (n) => String(n).padStart(2, "0");
+const iso = (dt) => `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+const todayISO = () => iso(new Date());
+const parse = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+const diff = (a, b) => Math.round((parse(a) - parse(b)) / 86400000);
+const fShort = (s) => parse(s).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+const fDow = (s) => parse(s).toLocaleDateString(undefined, { weekday: "short" });
+const fLtr = (s) => parse(s).toLocaleDateString(undefined, { weekday: "narrow" });
+const fNum = (s) => parse(s).getDate();
+const ytURL = (q) => `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
+const fmtPace = (raw) => { const d = String(raw).replace(/\D/g, "").slice(0, 4); return d.length <= 2 ? d : d.slice(0, d.length - 2) + ":" + d.slice(-2); };
+const fmtSplits = (raw) => String(raw).replace(/\d{3,4}/g, (m) => m.slice(0, m.length - 2) + ":" + m.slice(-2));
+const KEY = "sub18local:v1";
+
+/* ═══════════════ STORAGE ═══════════════ */
+function loadState() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return { logs: {}, ov: {}, applied: [] };
+    const v = JSON.parse(raw);
+    return { logs: v.logs || {}, ov: v.ov || {}, applied: v.applied || [] };
+  } catch (e) { return { logs: {}, ov: {}, applied: [] }; }
+}
+function saveState(n) {
+  try { localStorage.setItem(KEY, JSON.stringify(n)); return true; }
+  catch (e) { return false; }
+}
+
+/* ═══════════════ ADJUSTMENTS ═══════════════ */
+function adjust(days, logs, today) {
+  const out = [];
+  const past = days.filter((x) => x.d < today);
+  const future = days.filter((x) => x.d >= today);
+  const missed = (x) => logs[x.d] && logs[x.d].status === "missed";
+  const done = (x) => logs[x.d] && logs[x.d].status !== "missed";
+
+  const pain = past.filter((x) => logs[x.d] && logs[x.d].pain).sort((a, b) => (a.d < b.d ? 1 : -1))[0];
+  if (pain && diff(today, pain.d) <= 4) {
+    const n2 = future.filter((x) => x.ty !== "rest").slice(0, 2);
+    out.push({ id: "pain", sev: "alert", title: "You flagged pain",
+      body: `Logged ${fShort(pain.d)}. Sharp or one-sided pain is a different signal from workout fatigue. Back off, and if it hasn't settled in a few days get it looked at.`,
+      apply: n2.length ? { label: `Make ${n2.map((x) => fDow(x.d)).join(" & ")} easy`,
+        edits: n2.map((x, i) => ({ d: x.d, patch: i === 0
+          ? { ty: "rest", mi: 0, t: "Rest — pain", s: "Full day off", lift: null, core: false, ln: null }
+          : { ty: "easy", mi: 2.5, t: "Easy — pain", s: "2–3 mi very easy, stop if symptomatic", lift: null, ln: null } })) } : null });
+  }
+
+  past.filter((x) => QUALITY.has(x.ty) && missed(x) && diff(today, x.d) <= 7).forEach((m) => {
+    const slot = future.find((x) => {
+      if (["rest", "race", "long"].includes(x.ty) || QUALITY.has(x.ty)) return false;
+      return days.filter((y) => QUALITY.has(y.ty) && y.d !== m.d).every((y) => Math.abs(diff(x.d, y.d)) >= 2);
+    });
+    out.push({ id: `mq-${m.d}`, sev: "warn", title: `Missed ${m.t} · ${fShort(m.d)}`,
+      body: slot ? `${fShort(slot.d)} works and keeps 48 hours between hard days.`
+        : `No slot left that keeps 48 hours between hard days. Let it go — one missed session won't cost you the goal, two crowded ones can.`,
+      apply: slot ? { label: `Move to ${fDow(slot.d)}`, edits: [{ d: slot.d, patch: { ty: m.ty, mi: m.mi, t: m.t, s: m.s, moved: `from ${fShort(m.d)}` } }] } : null });
+  });
+
+  let gap = 0;
+  for (let i = past.length - 1; i >= 0; i--) {
+    const x = past[i];
+    if (x.ty === "rest") continue;
+    if (missed(x) || !logs[x.d]) gap++; else break;
+  }
+  if (gap >= 3) {
+    const nq = future.find((x) => QUALITY.has(x.ty) && x.ty !== "race");
+    out.push({ id: "gap", sev: "warn", title: `${gap} run days missed`,
+      body: `The instinct is to make it up. Don't. Take 25% off the next hard session and you'll absorb the rest of the block better.`,
+      apply: nq ? { label: `Trim ${fDow(nq.d)} by 25%`, edits: [{ d: nq.d, patch: { mi: Math.round(nq.mi * 0.78 * 2) / 2, t: nq.t + " (reduced)", s: nq.s + " — cut 25% of the reps" } }] } : null });
+  }
+
+  const lh = past.filter((x) => QUALITY.has(x.ty) && done(x)).sort((a, b) => (a.d < b.d ? 1 : -1))[0];
+  if (lh && logs[lh.d].rpe >= 9 && diff(today, lh.d) <= 5) {
+    const nq = future.find((x) => QUALITY.has(x.ty) && x.ty !== "race");
+    out.push({ id: "rpe", sev: "warn", title: `${lh.t} hit RPE ${logs[lh.d].rpe}`,
+      body: `A 7–8 session landing at ${logs[lh.d].rpe} usually means fatigue, not a fitness jump. Ease the next one instead of chasing paces.`,
+      apply: nq ? { label: `Ease ${fDow(nq.d)} by 5 sec/mi`, edits: [{ d: nq.d, patch: { t: nq.t + " (eased)", s: nq.s + " — ease 5 sec/mi" } }] } : null });
+  }
+
+  const ld = past.filter((x) => x.lift);
+  const lDone = ld.filter((x) => logs[x.d] && logs[x.d].lift).length;
+  if (ld.length >= 3 && lDone / ld.length < 0.5) {
+    out.push({ id: "lift", sev: "info", title: `Strength: ${lDone} of ${ld.length}`,
+      body: `Doesn't change the running plan. But the Nordics and calf work are most of what keeps you healthy, and the plyos are the part that makes you faster. A 15-minute version counts.`, apply: null });
+  }
+
+  const dOut = diff(RACE, today);
+  if (dOut <= 7 && dOut >= 0) {
+    out.push({ id: "taper", sev: "info", title: `${dOut} day${dOut === 1 ? "" : "s"} out`,
+      body: `Nothing you add now makes you fitter; plenty could make you flatter. No strength work, no new shoes, no new breakfast.`, apply: null });
+  }
+  return out;
+}
+
+/* ═══════════════ ICONS ═══════════════ */
+const Icon = ({ n }) => {
+  const p = {
+    today: "M12 7v5l3 2M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
+    plan: "M4 6h16M4 12h16M4 18h10",
+    lift: "M4 9v6M8 7v10M16 7v10M20 9v6M8 12h8",
+    mob: "M3 14c2.5-4 4.5-4 7 0s4.5 4 7 0M3 8c2.5-4 4.5-4 7 0s4.5 4 7 0",
+    adj: "M4 8h10M18 8h2M4 16h4M12 16h8M15 5v6M9 13v6",
+  }[n];
+  return <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={p} /></svg>;
+};
+
+/* ═══════════════ APP ═══════════════ */
+function App() {
+  const init = loadState();
+  const [logs, setLogs] = useState(init.logs);
+  const [ov, setOv] = useState(init.ov);
+  const [applied, setApplied] = useState(init.applied);
+  const [toast, setToast] = useState(null);
+  const [tab, setTab] = useState("today");
+  const [editing, setEditing] = useState(null);
+  const mainRef = useRef(null);
+  const fileRef = useRef(null);
+  const today = todayISO();
+
+  const flash = (msg, bad) => { setToast({ msg, bad }); setTimeout(() => setToast(null), 2200); };
+
+  useEffect(() => { if (mainRef.current) mainRef.current.scrollTop = 0; }, [tab]);
+
+  const commit = useCallback((next, msg) => {
+    const ok = saveState(next);
+    if (msg) flash(ok ? msg : msg + " · couldn't save to this device", !ok);
+  }, []);
+
+  const days = useMemo(() => PLAN.map((p) => ({ ...p, ...(ov[p.d] || {}) })), [ov]);
+  const cards = useMemo(() => adjust(days, logs, today).filter((c) => !applied.some((a) => a.id === c.id)), [days, logs, today, applied]);
+
+  const saveLog = (d, e) => { const n = { ...logs, [d]: e }; setLogs(n); commit({ logs: n, ov, applied }, "Session logged"); setEditing(null); };
+  const delLog = (d) => { const n = { ...logs }; delete n[d]; setLogs(n); commit({ logs: n, ov, applied }, "Entry deleted"); setEditing(null); };
+  const applyCard = (c) => {
+    const n = { ...ov };
+    c.apply.edits.forEach((e) => { n[e.d] = { ...(n[e.d] || {}), ...e.patch }; });
+    const a = [...applied, { id: c.id, label: c.apply.label, on: today }];
+    setOv(n); setApplied(a); commit({ logs, ov: n, applied: a }, "Plan updated");
+  };
+
+  const stats = useMemo(() => {
+    const p = days.filter((x) => x.d <= today).reduce((a, x) => a + x.mi, 0);
+    const a = Object.values(logs).reduce((s, l) => s + (l.miles || 0), 0);
+    const q = days.filter((x) => QUALITY.has(x.ty) && x.d < today);
+    return { planned: p, actual: a, qT: q.length, qD: q.filter((x) => logs[x.d] && logs[x.d].status !== "missed").length };
+  }, [days, logs, today]);
+
+  const handoff = useMemo(() => summary(days, logs, applied, today, stats), [days, logs, applied, today, stats]);
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(handoff); flash("Copied to clipboard"); }
+    catch (e) { flash("Select the text and copy manually", true); }
+  };
+
+  const exportBackup = () => {
+    try {
+      const blob = new Blob([JSON.stringify({ logs, ov, applied, savedAt: new Date().toISOString() }, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = `sub18-backup-${today}.json`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      flash("Backup downloaded");
+    } catch (e) { flash("Couldn't create the backup file", true); }
+  };
+
+  const importBackup = (file) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const v = JSON.parse(reader.result);
+        if (!v || typeof v !== "object" || !("logs" in v)) { flash("That file isn't a valid backup", true); return; }
+        const next = { logs: v.logs || {}, ov: v.ov || {}, applied: v.applied || [] };
+        setLogs(next.logs); setOv(next.ov); setApplied(next.applied);
+        commit(next, "Backup restored");
+      } catch (e) { flash("Couldn't read that file", true); }
+    };
+    reader.onerror = () => flash("Couldn't read that file", true);
+    reader.readAsText(file);
+  };
+
+  const resetAll = () => {
+    const next = { logs: {}, ov: {}, applied: [] };
+    setLogs({}); setOv({}); setApplied([]);
+    commit(next, "All data cleared");
+  };
+
+  const dOut = diff(RACE, today);
+  const cur = days.find((x) => x.d === today) || days.find((x) => x.d >= today);
+
+  return (
+    <div className="app">
+      <header className="hdr">
+        <div><div className="hdr-t">Sub-18 · 5K</div><div className="hdr-s">Sat 3 Oct · goal 5:44–5:47/mi</div></div>
+        <div className="hdr-cd"><b>{dOut >= 0 ? dOut : "—"}</b><span>days</span></div>
+      </header>
+
+      <main className="main" ref={mainRef}>
+        {tab === "today" && <Today day={cur} today={today} days={days} logs={logs} onEdit={setEditing} cards={cards} go={setTab} />}
+        {tab === "plan" && <Plan days={days} logs={logs} today={today} stats={stats} onEdit={setEditing} />}
+        {tab === "lift" && <Strength />}
+        {tab === "mob" && <Mobility />}
+        {tab === "adj" && <Adjust cards={cards} applied={applied} onApply={applyCard} handoff={handoff} copy={copy}
+          onExport={exportBackup} onImport={() => fileRef.current && fileRef.current.click()} onReset={resetAll} />}
+      </main>
+
+      <input ref={fileRef} type="file" accept="application/json,.json" style={{ display: "none" }}
+        onChange={(e) => { const f = e.target.files[0]; if (f) importBackup(f); e.target.value = ""; }} />
+
+      {toast && <div className={"toast" + (toast.bad ? " bad" : "")}>{toast.msg}</div>}
+
+      <nav className="tabbar">
+        {[["today", "Today"], ["plan", "Plan"], ["lift", "Strength"], ["mob", "Mobility"], ["adj", "Adjust"]].map(([k, l]) => (
+          <button key={k} className={"tb" + (tab === k ? " on" : "")} onClick={() => setTab(k)} aria-label={l} aria-current={tab === k}>
+            <span className="tb-i"><Icon n={k} />{k === "adj" && cards.length > 0 && <i className="dot" />}</span>
+            <span className="tb-l">{l}</span>
+          </button>
+        ))}
+      </nav>
+
+      {editing && <Sheet day={days.find((x) => x.d === editing)} existing={logs[editing]} onSave={saveLog} onDelete={delLog} onClose={() => setEditing(null)} />}
+    </div>
+  );
+}
+
+/* ═══════════════ VIEWS ═══════════════ */
+function WeekStrip({ days, today, logs, onEdit }) {
+  const cw = (days.find((x) => x.d >= today) || days[days.length - 1]).w;
+  const wd = days.filter((x) => x.w === cw);
+  return (
+    <div className="strip-wrap">
+      {wd.map((x) => {
+        const l = logs[x.d];
+        const isT = x.d === today;
+        const past = x.d < today;
+        return (
+          <button key={x.d} className={"sday" + (isT ? " t" : "")} onClick={() => onEdit(x.d)}>
+            <span className="sd-l">{fLtr(x.d)}</span>
+            <span className="sd-dot" style={{
+              background: l && l.status !== "missed" ? TIER[x.ty] : "transparent",
+              borderColor: l && l.status === "missed" ? "#E4544B" : TIER[x.ty],
+              opacity: past && !l ? 0.35 : 1,
+            }} />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function Today({ day, today, days, logs, onEdit, cards, go }) {
+  if (!day) return <div className="card"><h3>Block complete</h3><p className="p">Log the race, then take a down week.</p></div>;
+  const l = logs[day.d];
+  const alert = cards.find((c) => c.sev === "alert");
+  const c = TIER[day.ty];
+  return (
+    <React.Fragment>
+      <WeekStrip days={days} today={today} logs={logs} onEdit={onEdit} />
+      {alert && <button className="strip" onClick={() => go("adj")}>{alert.title} — see the adjustment</button>}
+      {day.d !== today && <div className="lead">Next session</div>}
+      <section className="sess" style={{ borderLeft: `4px solid ${c}` }}>
+        <div className="sess-h">
+          <span>{fShort(day.d)}</span>
+          <span className="tag" style={{ color: c, borderColor: c + "55", background: c + "1C" }}>{LABEL[day.ty]}</span>
+        </div>
+        <h2>{day.t}</h2>
+        <p className="sess-d">{day.s}</p>
+        {day.moved && <p className="moved">Moved {day.moved}</p>}
+        <div className="meta">
+          {day.mi > 0 && <div><span>Distance</span><b>{day.mi} mi</b></div>}
+          {day.lift && <div><span>Strength</span><b>Session {day.lift}</b></div>}
+          {day.core && <div><span>Core</span><b>10–12 min</b></div>}
+        </div>
+        {day.ln && <p className="ln">{day.ln}</p>}
+        <div className="links">
+          {(day.lift || day.core) && <button className="link" onClick={() => go("lift")}>{day.lift ? `Session ${day.lift}` : "Core"} →</button>}
+          {day.mi > 0 && <button className="link" onClick={() => go("mob")}>Post-run →</button>}
+        </div>
+        {l ? (
+          <div className="done">
+            <div className="done-r">
+              <span className={"pill " + l.status}>{l.status === "done" ? "As planned" : l.status === "modified" ? "Modified" : "Missed"}</span>
+              {l.miles > 0 && <span className="mono">{l.miles} mi</span>}
+              {l.avgPace && <span className="mono">{l.avgPace}/mi</span>}
+              {l.rpe > 0 && <span className="mono">RPE {l.rpe}</span>}
+              {l.lift && <span className="mono">lift ✓</span>}
+              {l.core && <span className="mono">core ✓</span>}
+              {l.mob && <span className="mono">mob ✓</span>}
+            </div>
+            {l.notes && <p className="note">{l.notes}</p>}
+            <button className="btn ghost" onClick={() => onEdit(day.d)}>Edit</button>
+          </div>
+        ) : <button className="btn solid" onClick={() => onEdit(day.d)}>Log this session</button>}
+      </section>
+    </React.Fragment>
+  );
+}
+
+function Plan({ days, logs, today, stats, onEdit }) {
+  const [open, setOpen] = useState(() => (days.find((x) => x.d >= today) || days[0]).w);
+  const ws = [...new Set(days.map((x) => x.w))];
+  const legend = [["easy", "Easy"], ["long", "Long"], ["threshold", "Threshold"], ["vo2", "Hard"], ["race", "Race"]];
+  return (
+    <React.Fragment>
+      <div className="kpi">
+        <div><b>{stats.actual.toFixed(1)}<em>/{stats.planned.toFixed(1)}</em></b><span>miles</span></div>
+        <div><b>{stats.qD}<em>/{stats.qT}</em></b><span>hard sessions</span></div>
+      </div>
+      <div className="leg">{legend.map(([k, n]) => <span key={k}><i style={{ background: TIER[k] }} />{n}</span>)}</div>
+      {ws.map((w) => {
+        const wd = days.filter((x) => x.w === w);
+        const pl = wd.reduce((a, x) => a + x.mi, 0);
+        const ac = wd.reduce((a, x) => a + (logs[x.d] ? (logs[x.d].miles || 0) : 0), 0);
+        const isOpen = open === w;
+        return (
+          <section key={w} className="wk">
+            <button className="wk-h" onClick={() => setOpen(isOpen ? null : w)}>
+              <span className="wk-n">{w}</span>
+              <span className="wk-i"><b>{WEEKS[w]}</b></span>
+              <span className="wk-m mono">{ac > 0 ? `${ac.toFixed(1)}/${pl.toFixed(1)}` : pl.toFixed(1)}</span>
+              <span className={"chev" + (isOpen ? " up" : "")}>›</span>
+            </button>
+            {isOpen && (
+              <div className="dlist">
+                {wd.map((x) => {
+                  const l = logs[x.d];
+                  const c = TIER[x.ty];
+                  return (
+                    <div key={x.d} className={"row" + (x.d === today ? " now" : "")}>
+                      <button onClick={() => onEdit(x.d)}>
+                        <i className="bar" style={{ background: c }} />
+                        <span className="row-d"><em>{fDow(x.d)}</em><b className="mono">{fNum(x.d)}</b></span>
+                        <span className="row-b">
+                          <b style={{ color: c }}>{x.t}</b><small>{x.s}</small>
+                          <span className="chips">
+                            {x.lift && <i className="chip">Lift {x.lift}</i>}
+                            {x.core && <i className="chip">Core</i>}
+                          </span>
+                          {l && <span className={"row-l " + l.status}>{l.status === "missed" ? "Missed" : `${l.miles || 0} mi${l.avgPace ? ` · ${l.avgPace}` : ""}${l.rpe ? ` · RPE ${l.rpe}` : ""}`}</span>}
+                        </span>
+                        <span className="row-m mono">{x.mi || ""}</span>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        );
+      })}
+    </React.Fragment>
+  );
+}
+
+function ExList({ items }) {
+  return (
+    <div className="ex">
+      {items.map((it, i) => (
+        <div className="exrow" key={i}>
+          <div className="exrow-h">
+            <b className="ex-n">{it.m}</b>
+            <span className="dose mono">{it.dose}</span>
+          </div>
+          <p className="ex-c">{it.cue}</p>
+          <div className="ex-a">
+            <a className="vid" href={ytURL(it.q)} target="_blank" rel="noopener noreferrer">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
+              Watch
+            </a>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Routine({ r }) {
+  return (
+    <section className="card">
+      <div className="rt-h"><h3>{r.title}</h3><p className="rt-f">{r.focus}</p><p className="rt-w">{r.when} · {r.mins}</p></div>
+      {r.blocks.map((b, i) => (
+        <div key={i} className="blk">
+          <div className="blk-h">{b.name}</div>
+          {b.note && <p className="blk-n">{b.note}</p>}
+          <ExList items={b.items} />
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function Strength() {
+  const [v, setV] = useState("A");
+  return (
+    <React.Fragment>
+      <div className="seg big">
+        {[["A", "Session A"], ["B", "Session B"], ["core", "Core"], ["why", "How"]].map(([k, l]) => (
+          <button key={k} className={"sg" + (v === k ? " on" : "")} onClick={() => setV(k)}>{l}</button>
+        ))}
+      </div>
+      {v === "why" && (
+        <section className="card">
+          <h3>How to run this</h3>
+          <p className="kit">{KIT}</p>
+          <div className="prin">{PRINCIPLES.map((p, i) => <div className="prin-i" key={i}>{p}</div>)}</div>
+          <p className="p small dim">Full load weeks 1–3 · reduced week 4 · one session week 5 · none week 6. Last lift Tue 22 Sep.</p>
+        </section>
+      )}
+      {(v === "A" || v === "B") && <Routine r={LIFTS[v]} />}
+      {v === "core" && (
+        <section className="card">
+          <div className="rt-h"><h3>{CORE.title}</h3><p className="rt-f">{CORE.focus}</p><p className="rt-w">{CORE.when} · {CORE.mins}</p></div>
+          <p className="why-box">{CORE.note}</p>
+          <ExList items={CORE.items} />
+        </section>
+      )}
+    </React.Fragment>
+  );
+}
+
+function Mobility() {
+  const [v, setV] = useState("post");
+  const r = MOB[v];
+  return (
+    <React.Fragment>
+      <div className="seg big">
+        {[["post", "After runs"], ["pre", "Before workouts"]].map(([k, l]) => (
+          <button key={k} className={"sg" + (v === k ? " on" : "")} onClick={() => setV(k)}>{l}</button>
+        ))}
+      </div>
+      <section className="card">
+        <div className="rt-h"><h3>{r.title}</h3><p className="rt-w">{r.mins}</p></div>
+        <p className="why-box">{r.note}</p>
+        <ExList items={r.items} />
+      </section>
+    </React.Fragment>
+  );
+}
+
+function Adjust({ cards, applied, onApply, handoff, copy, onExport, onImport, onReset }) {
+  const [confirm, setConfirm] = useState(false);
+  return (
+    <React.Fragment>
+      {cards.length === 0
+        ? <div className="card"><h3>Plan stands</h3><p className="p">Changes appear here when you log a missed day, a swap, a session that ran too hard, or pain.</p></div>
+        : cards.map((c) => (
+          <article key={c.id} className={"adj " + c.sev}>
+            <h3>{c.title}</h3><p>{c.body}</p>
+            {c.apply && <button className="btn solid sm" onClick={() => onApply(c)}>{c.apply.label}</button>}
+          </article>
+        ))}
+      {applied.length > 0 && (
+        <section className="card"><h3>Applied</h3>
+          <div className="app">{applied.map((a, i) => <div className="app-i" key={i}><b>{a.label}</b><small>{fShort(a.on)}</small></div>)}</div>
+        </section>
+      )}
+
+      <section className="card">
+        <h3>Send me an update</h3>
+        <p className="p">Paste into our chat and I can advise without you re-explaining the block.</p>
+        <pre className="pre">{handoff}</pre>
+        <button className="btn solid" onClick={copy}>Copy summary</button>
+      </section>
+
+      <section className="card">
+        <h3>Backup</h3>
+        <p className="p">Your logs live in this browser on this device. Download a backup after big weeks — it restores everything in two taps if the browser clears its data or you switch phones.</p>
+        <div className="brow">
+          <button className="btn solid sm" onClick={onExport}>Download backup</button>
+          <button className="btn ghost sm" onClick={onImport}>Restore from file</button>
+        </div>
+      </section>
+
+      <section className="card">
+        <h3>Start over</h3>
+        {confirm ? (
+          <React.Fragment>
+            <p className="p small">This erases every log and plan change on this device. Download a backup first if you might want it back.</p>
+            <div className="brow">
+              <button className="btn danger sm" onClick={() => { onReset(); setConfirm(false); }}>Erase everything</button>
+              <button className="btn ghost sm" onClick={() => setConfirm(false)}>Keep my data</button>
+            </div>
+          </React.Fragment>
+        ) : <button className="btn ghost sm" onClick={() => setConfirm(true)}>Clear all data</button>}
+      </section>
+    </React.Fragment>
+  );
+}
+
+function Sheet({ day, existing, onSave, onDelete, onClose }) {
+  const [status, setStatus] = useState(existing ? existing.status : "done");
+  const [miles, setMiles] = useState(existing ? existing.miles : (day.mi || ""));
+  const [avgPace, setAvgPace] = useState(existing ? existing.avgPace || "" : "");
+  const [splits, setSplits] = useState(existing ? existing.splits || "" : "");
+  const [rpe, setRpe] = useState(existing ? existing.rpe || 0 : 0);
+  const [lift, setLift] = useState(existing ? !!existing.lift : false);
+  const [core, setCore] = useState(existing ? !!existing.core : false);
+  const [mob, setMob] = useState(existing ? !!existing.mob : false);
+  const [pain, setPain] = useState(existing ? !!existing.pain : false);
+  const [swap, setSwap] = useState(existing ? existing.swap || "" : "");
+  const [notes, setNotes] = useState(existing ? existing.notes || "" : "");
+  const off = status === "missed";
+
+  useEffect(() => {
+    const esc = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", esc);
+    return () => window.removeEventListener("keydown", esc);
+  }, [onClose]);
+
+  const submit = () => onSave(day.d, {
+    status, miles: off ? 0 : Number(miles) || 0, avgPace: off ? "" : avgPace.trim(),
+    splits: off ? "" : splits.trim(), rpe: off ? 0 : Number(rpe) || 0,
+    lift: off ? false : lift, core: off ? false : core, mob: off ? false : mob,
+    pain, swap: status === "modified" ? swap.trim() : "", notes: notes.trim(),
+  });
+
+  return (
+    <div className="wrap" role="dialog" aria-modal="true" aria-label={`Log ${day.t}`}>
+      <div className="scrim" onClick={onClose} />
+      <div className="sheet">
+        <div className="grip" />
+        <div className="sh-h">
+          <div><small>{fShort(day.d)}</small><h3>{day.t}</h3></div>
+          <button className="x" onClick={onClose} aria-label="Close">✕</button>
+        </div>
+        <div className="sh-b">
+          <div className="f">
+            <label>How did it go?</label>
+            <div className="seg">
+              {[["done", "As planned"], ["modified", "Something else"], ["missed", "Missed"]].map(([k, l]) => (
+                <button key={k} className={"sg" + (status === k ? " on" : "")} onClick={() => setStatus(k)}>{l}</button>
+              ))}
+            </div>
+          </div>
+          {status === "modified" && (
+            <div className="f"><label>What instead?</label>
+              <input className="in" value={swap} onChange={(e) => setSwap(e.target.value)} placeholder="4×1000 instead of 6×800" /></div>
+          )}
+          {!off && (
+            <React.Fragment>
+              <div className="fr">
+                <div className="f"><label>Miles</label><input className="in mono" inputMode="decimal" value={miles} onChange={(e) => setMiles(e.target.value)} placeholder="0" /></div>
+                <div className="f"><label>Avg pace</label><input className="in mono" inputMode="numeric" value={avgPace} onChange={(e) => setAvgPace(fmtPace(e.target.value))} placeholder="6:12" /></div>
+              </div>
+              {QUALITY.has(day.ty) && (
+                <div className="f"><label>Splits</label><input className="in mono" value={splits} onChange={(e) => setSplits(fmtSplits(e.target.value))} placeholder="2:56 / 2:54 / 2:57" /></div>
+              )}
+              <div className="f">
+                <label>Effort <b className="rpe">{rpe || "—"}</b></label>
+                <input type="range" min="0" max="10" value={rpe} onChange={(e) => setRpe(e.target.value)} className="sl" />
+                <div className="sc"><span>easy</span><span>comfortably hard</span><span>all out</span></div>
+              </div>
+              <div className="f">
+                <label>Also done</label>
+                <div className="ck">
+                  {day.lift && <button className={"cb" + (lift ? " on" : "")} onClick={() => setLift(!lift)}>Session {day.lift}</button>}
+                  {day.core && <button className={"cb" + (core ? " on" : "")} onClick={() => setCore(!core)}>Core</button>}
+                  <button className={"cb" + (mob ? " on" : "")} onClick={() => setMob(!mob)}>Mobility</button>
+                </div>
+              </div>
+            </React.Fragment>
+          )}
+          <div className="f">
+            <button className={"cb w" + (pain ? " on red" : "")} onClick={() => setPain(!pain)}>
+              {pain ? "Flagged: something hurts" : "Flag pain or a niggle"}
+            </button>
+          </div>
+          <div className="f"><label>Notes</label>
+            <textarea className="in ta" rows="2" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Legs, weather, sleep" /></div>
+        </div>
+        <div className="sh-f">
+          {existing && <button className="btn ghost sm" onClick={() => onDelete(day.d)}>Delete</button>}
+          <button className="btn solid" onClick={submit}>Save</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function summary(days, logs, applied, today, stats) {
+  const L = [`SUB-18 UPDATE · ${fShort(today)} · ${diff(RACE, today)} days out`,
+  `Volume ${stats.actual.toFixed(1)}/${stats.planned.toFixed(1)} mi · hard sessions ${stats.qD}/${stats.qT}`];
+  const recent = days.filter((x) => x.d <= today && diff(today, x.d) <= 14 && logs[x.d]);
+  if (recent.length) {
+    L.push("", "LAST 14 DAYS");
+    recent.forEach((x) => {
+      const l = logs[x.d];
+      let s = `${fShort(x.d)} · ${x.t} — `;
+      if (l.status === "missed") s += "MISSED";
+      else {
+        const b = [];
+        if (l.status === "modified" && l.swap) b.push(`did: ${l.swap}`);
+        if (l.miles) b.push(`${l.miles} mi`);
+        if (l.avgPace) b.push(`${l.avgPace}/mi`);
+        if (l.splits) b.push(l.splits);
+        if (l.rpe) b.push(`RPE ${l.rpe}`);
+        if (l.lift) b.push("lift ✓");
+        if (l.core) b.push("core ✓");
+        if (l.mob) b.push("mob ✓");
+        s += b.join(" · ") || "logged";
+      }
+      if (l.pain) s += " ⚑ PAIN";
+      if (l.notes) s += ` — "${l.notes}"`;
+      L.push(s);
+    });
+  }
+  const un = days.filter((x) => x.d < today && x.ty !== "rest" && !logs[x.d]).length;
+  if (un) L.push("", `Unlogged run days: ${un}`);
+  if (applied.length) { L.push("", "CHANGES APPLIED"); applied.forEach((a) => L.push(`${fShort(a.on)} · ${a.label}`)); }
+  L.push("", "NEXT UP");
+  days.filter((x) => x.d >= today).slice(0, 4).forEach((x) => L.push(`${fShort(x.d)} · ${x.t} — ${x.s}`));
+  L.push("", "Question:");
+  return L.join("\n");
+}
+
+/* ═══════════════ STYLE ═══════════════ */
+const CSS = `
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;text-align:left}
+h1,h2,h3{margin:0;font-weight:650;letter-spacing:-.01em}
+p{margin:0}a{color:inherit;text-decoration:none}
+body{color:#E6EAED;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+.mono{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+.app{display:flex;flex-direction:column;height:100vh;height:100dvh;overflow:hidden}
+.hdr{flex-shrink:0;display:flex;justify-content:space-between;align-items:center;padding:calc(16px + env(safe-area-inset-top)) 20px 15px;background:#14181B;border-bottom:1px solid #232A2F}
+.hdr-t{font-size:17px;font-weight:650;letter-spacing:-.02em}
+.hdr-s{font-size:12.5px;color:#8B949B;margin-top:2px}
+.hdr-cd{text-align:right;line-height:1}
+.hdr-cd b{font-size:26px;font-weight:650;font-variant-numeric:tabular-nums;color:#6C9CF0}
+.hdr-cd span{display:block;font-size:11px;color:#8B949B;margin-top:3px}
+.main{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:14px 14px 24px;max-width:620px;width:100%;margin:0 auto}
+.lead{font-size:12px;color:#8B949B;margin-bottom:8px;padding-left:2px}
+.dim{color:#71797F}
+.tabbar{flex-shrink:0;display:flex;background:rgba(20,24,27,.94);backdrop-filter:blur(14px);border-top:1px solid #232A2F;padding-bottom:env(safe-area-inset-bottom)}
+.tb{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 2px 7px;color:#767F86;transition:color .15s}
+.tb.on{color:#7DA9F5}
+.tb:active{opacity:.6}
+.tb-i{position:relative;display:block;line-height:0}
+.tb-l{font-size:10px;font-weight:550}
+.tb .dot{position:absolute;top:-1px;right:-3px;width:7px;height:7px;border-radius:50%;background:#E4544B;border:1.5px solid #14181B}
+.strip-wrap{display:flex;gap:5px;margin-bottom:14px}
+.sday{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;padding:9px 0 8px;background:#161A1D;border:1px solid #242B30;border-radius:10px;transition:transform .1s}
+.sday:active{transform:scale(.95)}
+.sday.t{border-color:#4C7EE0;background:#191E24}
+.sd-l{font-size:10.5px;font-weight:600;color:#8B949B;text-transform:uppercase}
+.sday.t .sd-l{color:#7DA9F5}
+.sd-dot{width:9px;height:9px;border-radius:50%;border:2px solid}
+.card,.sess,.adj,.wk{background:#161A1D;border:1px solid #242B30;border-radius:12px}
+.card{padding:18px;margin-bottom:12px}
+.card h3{font-size:15.5px;margin-bottom:9px}
+.p{font-size:14px;line-height:1.55;color:#AEB7BD}
+.p.small{font-size:13px}
+.sess{padding:18px;margin-bottom:12px}
+.sess-h{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:#8B949B}
+.tag{font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;border:1px solid}
+.sess h2{font-size:23px;line-height:1.15;letter-spacing:-.022em;margin:10px 0 6px}
+.sess-d{font-size:15px;line-height:1.5;color:#AEB7BD}
+.moved{font-size:12.5px;color:#7DA9F5;margin-top:7px;font-weight:550}
+.ln{font-size:12.5px;color:#E0B45E;background:#241D0D;padding:9px 11px;border-radius:8px;line-height:1.45;margin-bottom:12px}
+.meta{display:flex;gap:26px;margin:16px 0 12px;padding-top:14px;border-top:1px solid #242B30}
+.meta span{display:block;font-size:11px;color:#71797F;margin-bottom:2px}
+.meta b{font-size:15px;font-weight:600}
+.links{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:6px}
+.link{font-size:13.5px;color:#7DA9F5;font-weight:550;padding:4px 0}
+.done{margin-top:12px;padding-top:14px;border-top:1px solid #242B30}
+.done-r{display:flex;gap:9px;flex-wrap:wrap;align-items:center;font-size:13.5px;color:#AEB7BD}
+.pill{font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:999px}
+.pill.done{background:#14301E;color:#5FC28C}
+.pill.modified{background:#33280F;color:#E0B45E}
+.pill.missed{background:#3A1D17;color:#F09383}
+.note{font-size:13.5px;line-height:1.5;color:#8B949B;margin-top:9px}
+.strip{display:block;width:100%;background:#3A1D17;color:#F09383;padding:12px 14px;border-radius:10px;font-size:13.5px;font-weight:550;margin-bottom:12px}
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:13px 18px;border-radius:10px;font-size:14.5px;font-weight:600;transition:transform .1s,opacity .1s}
+.btn:active{transform:scale(.98);opacity:.85}
+.btn.solid{background:#4C7EE0;color:#fff;width:100%;margin-top:14px}
+.btn.ghost{border:1px solid #2E363C;color:#AEB7BD;margin-top:12px}
+.btn.danger{background:#C24A3E;color:#fff;margin-top:0}
+.btn.sm{padding:10px 15px;font-size:13.5px;width:auto;margin-top:0}
+.brow{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
+.kpi{display:flex;gap:10px;margin-bottom:12px}
+.kpi>div{flex:1;background:#161A1D;border:1px solid #242B30;border-radius:12px;padding:14px}
+.kpi b{display:block;font-size:22px;font-weight:650;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.kpi em{font-style:normal;font-size:14px;color:#5F686E;font-weight:500}
+.kpi span{font-size:11.5px;color:#8B949B;margin-top:2px;display:block}
+.leg{display:flex;gap:13px;flex-wrap:wrap;padding:0 4px 14px;font-size:11px;color:#8B949B}
+.leg span{display:flex;align-items:center;gap:5px}
+.leg i{width:8px;height:8px;border-radius:2px;display:inline-block}
+.wk{margin-bottom:9px;overflow:hidden}
+.wk-h{display:flex;align-items:center;gap:12px;width:100%;padding:14px 15px}
+.wk-h:active{background:#191E22}
+.wk-n{width:22px;height:22px;border-radius:6px;background:#232A2F;color:#8B949B;font-size:12px;font-weight:600;display:grid;place-items:center;flex-shrink:0}
+.wk-i{flex:1}.wk-i b{font-size:14.5px;font-weight:550}
+.wk-m{font-size:13px;color:#8B949B}
+.chev{color:#5F686E;font-size:19px;transform:rotate(90deg);transition:transform .2s}
+.chev.up{transform:rotate(-90deg)}
+.dlist{border-top:1px solid #232A2F}
+.row{border-top:1px solid #232A2F}
+.row:first-child{border-top:none}
+.row button{display:flex;gap:10px;align-items:flex-start;width:100%;padding:11px 15px 11px 0}
+.row button:active{background:#1A1F23}
+.row.now{background:#191E22}
+.bar{width:4px;align-self:stretch;flex-shrink:0;border-radius:0 2px 2px 0}
+.row-d{width:30px;flex-shrink:0;text-align:center}
+.row-d em{display:block;font-style:normal;font-size:10.5px;color:#71797F}
+.row-d b{font-size:16px;font-weight:600}
+.row-b{flex:1;min-width:0}
+.row-b>b{display:block;font-size:14px;font-weight:600}
+.row-b small{display:block;font-size:12px;color:#8B949B;line-height:1.35;margin-top:1px}
+.chips{display:flex;gap:5px;margin-top:5px}
+.chip{font-style:normal;font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:999px;background:#232A2F;color:#8B949B}
+.row-l{display:inline-block;margin-top:6px;font-size:11.5px;font-variant-numeric:tabular-nums;padding:2px 7px;border-radius:6px;background:#1B2A45;color:#7DA9F5}
+.row-l.missed{background:#3A1D17;color:#F09383}
+.row-l.modified{background:#33280F;color:#E0B45E}
+.row-m{font-size:12.5px;color:#5F686E;flex-shrink:0;padding-top:2px}
+.seg{display:flex;background:#1B2126;border-radius:10px;padding:3px}
+.seg.big{margin-bottom:14px}
+.sg{flex:1;padding:9px 6px;font-size:13px;font-weight:550;color:#8B949B;border-radius:8px;text-align:center;transition:background .15s,color .15s}
+.sg.on{background:#2E373E;color:#E6EAED}
+.rt-h{padding-bottom:14px;border-bottom:1px solid #242B30;margin-bottom:4px}
+.rt-h h3{font-size:18px;letter-spacing:-.02em}
+.rt-f{font-size:13.5px;color:#AEB7BD;margin-top:3px}
+.rt-w{font-size:12.5px;color:#71797F;margin-top:5px}
+.kit{font-size:12.5px;color:#7DA9F5;background:#1B2A45;padding:9px 11px;border-radius:8px;margin-bottom:12px}
+.why-box{font-size:13px;line-height:1.6;color:#AEB7BD;background:#1B2126;padding:13px;border-radius:9px;margin:14px 0 4px}
+.blk{padding-top:16px}
+.blk-h{font-size:11.5px;font-weight:650;letter-spacing:.07em;text-transform:uppercase;color:#7DA9F5}
+.blk-n{font-size:12.5px;color:#8B949B;line-height:1.45;margin-top:5px}
+.ex{display:block;width:100%}
+.exrow{display:block;width:100%;padding:14px 0;border-bottom:1px solid #212830}
+.exrow:last-child{border-bottom:none;padding-bottom:2px}
+.exrow-h{display:flex;flex-direction:row;justify-content:space-between;align-items:baseline;gap:10px;width:100%}
+.ex-n{flex:1 1 auto;min-width:0;font-size:14.5px;font-weight:600;line-height:1.32;overflow-wrap:anywhere}
+.dose{flex:0 0 auto;white-space:nowrap;font-size:12.5px;color:#7DA9F5;font-weight:600}
+.ex-c{display:block;width:100%;font-size:13px;line-height:1.55;color:#8B949B;margin-top:5px}
+.ex-a{display:block;width:100%;margin-top:9px}
+.vid{display:inline-flex;align-items:center;gap:6px;width:auto;max-width:max-content;font-size:12.5px;line-height:1;color:#7DA9F5;font-weight:600;padding:8px 13px;border:1px solid #2A3A55;border-radius:8px}
+.vid:active{background:#1B2A45}
+.vid svg{flex:0 0 auto}
+.prin{display:block}
+.prin-i{display:block;font-size:13.5px;line-height:1.55;color:#AEB7BD;padding:10px 0 10px 16px;position:relative;border-bottom:1px solid #212830}
+.prin-i:last-child{border-bottom:none}
+.prin-i:before{content:"";position:absolute;left:0;top:17px;width:5px;height:5px;border-radius:50%;background:#4C7EE0}
+.adj{padding:16px;margin-bottom:11px;border-left:3px solid #2E363C}
+.adj.alert{border-left-color:#E4544B}
+.adj.warn{border-left-color:#E0A93E}
+.adj.info{border-left-color:#4C7EE0}
+.adj h3{font-size:15px;margin-bottom:6px}
+.adj p{font-size:13.5px;line-height:1.55;color:#AEB7BD}
+.app{display:block}
+.app-i{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid #212830;font-size:13.5px}
+.app-i:first-child{border-top:none}
+.app-i small{color:#71797F;flex-shrink:0}
+.pre{background:#0B0E10;border:1px solid #242B30;color:#9FB0BC;font-size:11px;line-height:1.6;padding:13px;border-radius:9px;margin:11px 0 0;white-space:pre-wrap;word-break:break-word;max-height:200px;overflow:auto;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(78px + env(safe-area-inset-bottom));background:#2E373E;color:#E6EAED;font-size:13.5px;font-weight:550;padding:11px 18px;border-radius:999px;z-index:70;box-shadow:0 6px 24px rgba(0,0,0,.45);animation:pop .22s ease}
+.toast.bad{background:#5C2A20;color:#F5B3A4}
+@keyframes pop{from{opacity:0;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
+.wrap{position:fixed;inset:0;z-index:80;display:flex;align-items:flex-end;justify-content:center}
+.scrim{position:absolute;inset:0;background:rgba(0,0,0,.62);animation:fade .2s ease}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.sheet{position:relative;background:#161A1D;border:1px solid #242B30;border-bottom:none;width:100%;max-width:620px;max-height:92vh;display:flex;flex-direction:column;border-radius:18px 18px 0 0;animation:up .24s cubic-bezier(.32,.72,0,1)}
+@keyframes up{from{transform:translateY(100%)}to{transform:none}}
+@media(prefers-reduced-motion:reduce){.sheet,.scrim,.toast{animation:none}.chev{transition:none}}
+.grip{width:36px;height:4px;border-radius:2px;background:#39424A;margin:9px auto 0}
+.sh-h{display:flex;justify-content:space-between;gap:12px;padding:12px 18px 14px;border-bottom:1px solid #242B30}
+.sh-h small{font-size:12px;color:#71797F}
+.sh-h h3{font-size:19px;margin-top:3px;letter-spacing:-.02em}
+.x{font-size:16px;color:#8B949B;padding:6px 8px;align-self:flex-start}
+.sh-b{padding:16px 18px;overflow-y:auto;flex:1;overscroll-behavior:contain}
+.sh-f{display:flex;gap:9px;padding:12px 18px calc(12px + env(safe-area-inset-bottom));border-top:1px solid #242B30}
+.sh-f .btn{margin-top:0}
+.sh-f .btn.solid{flex:1}
+.f{margin-bottom:16px}
+.fr{display:flex;gap:11px}.fr .f{flex:1}
+.f label{display:block;font-size:12px;font-weight:600;color:#8B949B;margin-bottom:7px}
+.in{width:100%;padding:12px;font-size:16px;border:1px solid #2E363C;border-radius:10px;background:#0F1315;font-family:inherit;color:#E6EAED}
+.in::placeholder{color:#5A636A}
+.in:focus{outline:none;border-color:#4C7EE0;box-shadow:0 0 0 3px rgba(76,126,224,.2)}
+.ta{resize:vertical;line-height:1.45}
+.sl{width:100%;accent-color:#4C7EE0;height:28px}
+.sc{display:flex;justify-content:space-between;font-size:10.5px;color:#5F686E}
+.rpe{float:right;font-size:14px;color:#7DA9F5;font-variant-numeric:tabular-nums}
+.ck{display:flex;gap:9px;flex-wrap:wrap}
+.cb{padding:11px 15px;border:1px solid #2E363C;border-radius:10px;font-size:13.5px;font-weight:550;color:#AEB7BD;transition:transform .1s}
+.cb:active{transform:scale(.97)}
+.cb.on{background:#4C7EE0;border-color:#4C7EE0;color:#fff}
+.cb.on.red{background:#C24A3E;border-color:#C24A3E}
+.cb.w{width:100%;text-align:center}
+@media(min-width:560px){.main{padding:18px 18px 28px}.sess h2{font-size:26px}.tb-l{font-size:11px}}
+`;
+
+const styleEl = document.createElement("style");
+styleEl.textContent = CSS;
+document.head.appendChild(styleEl);
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
