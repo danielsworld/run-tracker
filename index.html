@@ -1076,6 +1076,7 @@ body{color:var(--bone);background:var(--ink);font-family:var(--body);font-weight
 .sheet{position:relative;background:var(--surface);border:1px solid var(--rule);border-bottom:none;width:100%;max-width:620px;max-height:calc(100% - env(safe-area-inset-top) - 10px);display:flex;flex-direction:column;border-radius:4px 4px 0 0;animation:up .24s cubic-bezier(.32,.72,0,1);transition:transform .22s cubic-bezier(.32,.72,0,1);will-change:transform}
 .sheet.dragging{transition:none}
 @keyframes up{from{transform:translateY(100%)}to{transform:none}}
+@keyframes popin{from{opacity:0;transform:translateY(10px) scale(.99)}to{opacity:1;transform:none}}
 @media(prefers-reduced-motion:reduce){.sheet,.scrim,.toast{animation:none}.chev,.hdr-cd b{transition:none}}
 .drag{flex-shrink:0;cursor:grab;touch-action:none;position:sticky;top:0;z-index:2;background:var(--surface);border-radius:4px 4px 0 0}
 .grip{width:34px;height:4px;border-radius:2px;background:var(--rule);margin:9px auto 0}
@@ -1106,7 +1107,19 @@ body{color:var(--bone);background:var(--ink);font-family:var(--body);font-weight
 .cb.on.red{background:#C24333;border-color:#C24333;color:#fff}
 .cb.w{width:100%;text-align:center}
 .build{text-align:center;font-family:var(--cond);font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--dim);padding:6px 0 8px}
-@media(min-width:560px){.main{padding:20px 18px calc(84px + env(safe-area-inset-bottom))}.sess h2{font-size:44px}.tb-l{font-size:11px}}
+@media(min-width:560px){
+  .main{padding:20px 18px calc(84px + env(safe-area-inset-bottom))}.sess h2{font-size:44px}.tb-l{font-size:11px}
+  /* A bottom sheet is right under a thumb, but reads as stuck to the edge on a
+     big screen — so above this width the log becomes a centred dialog. The
+     wrapper's padding also caps its height, letting a long form scroll inside. */
+  .wrap{align-items:center;padding:28px 20px}
+  .sheet{max-width:540px;max-height:100%;border-bottom:1px solid var(--rule);border-radius:4px;
+    box-shadow:0 20px 56px rgba(0,0,0,.6);animation:popin .2s cubic-bezier(.2,.8,.2,1)}
+  .drag{border-radius:4px 4px 0 0}
+  .grip{display:none}
+  .sh-h{padding-top:16px}
+  .sh-f{padding:12px 18px}
+}
 `;
 
 const styleEl = document.createElement("style");
