@@ -704,6 +704,21 @@ function Sheet({ day, existing, onSave, onDelete, onClose }) {
   const [swap, setSwap] = useState(existing ? existing.swap || "" : "");
   const [notes, setNotes] = useState(existing ? existing.notes || "" : "");
   const off = status === "missed";
+  const [dragY, setDragY] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const startY = useRef(null);
+
+  const onDragStart = (e) => { startY.current = e.touches[0].clientY; setDragging(true); };
+  const onDragMove = (e) => {
+    if (startY.current == null) return;
+    const dy = e.touches[0].clientY - startY.current;
+    setDragY(dy > 0 ? dy : 0);
+  };
+  const onDragEnd = () => {
+    setDragging(false);
+    if (dragY > 90) onClose(); else setDragY(0);
+    startY.current = null;
+  };
 
   useEffect(() => {
     const esc = (e) => { if (e.key === "Escape") onClose(); };
@@ -721,11 +736,13 @@ function Sheet({ day, existing, onSave, onDelete, onClose }) {
   return (
     <div className="wrap" role="dialog" aria-modal="true" aria-label={`Log ${day.t}`}>
       <div className="scrim" onClick={onClose} />
-      <div className="sheet">
-        <div className="grip" />
-        <div className="sh-h">
-          <div><small>{fShort(day.d)}</small><h3>{day.t}</h3></div>
-          <button className="x" onClick={onClose} aria-label="Close">✕</button>
+      <div className={"sheet" + (dragging ? " dragging" : "")} style={dragY ? { transform: `translateY(${dragY}px)` } : undefined}>
+        <div className="drag" onTouchStart={onDragStart} onTouchMove={onDragMove} onTouchEnd={onDragEnd}>
+          <div className="grip" />
+          <div className="sh-h">
+            <div><small>{fShort(day.d)}</small><h3>{day.t}</h3></div>
+            <button className="x" onClick={onClose} aria-label="Close">✕</button>
+          </div>
         </div>
         <div className="sh-b">
           <div className="f">
@@ -825,7 +842,7 @@ h1,h2,h3{margin:0;font-weight:650;letter-spacing:-.01em}
 p{margin:0}a{color:inherit;text-decoration:none}
 body{color:#E6EAED;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
 .mono{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
-.app{display:flex;flex-direction:column;height:100vh;height:100dvh;overflow:hidden}
+.app{position:fixed;inset:0;display:flex;flex-direction:column;overflow:hidden}
 .hdr{flex-shrink:0;display:flex;justify-content:space-between;align-items:center;padding:calc(16px + env(safe-area-inset-top)) 20px 15px;background:#14181B;border-bottom:1px solid #232A2F}
 .hdr-t{font-size:17px;font-weight:650;letter-spacing:-.02em}
 .hdr-s{font-size:12.5px;color:#8B949B;margin-top:2px}
@@ -961,14 +978,17 @@ body{color:#E6EAED;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Robot
 .wrap{position:fixed;inset:0;z-index:80;display:flex;align-items:flex-end;justify-content:center}
 .scrim{position:absolute;inset:0;background:rgba(0,0,0,.62);animation:fade .2s ease}
 @keyframes fade{from{opacity:0}to{opacity:1}}
-.sheet{position:relative;background:#161A1D;border:1px solid #242B30;border-bottom:none;width:100%;max-width:620px;max-height:92vh;display:flex;flex-direction:column;border-radius:18px 18px 0 0;animation:up .24s cubic-bezier(.32,.72,0,1)}
+.sheet{position:relative;background:#161A1D;border:1px solid #242B30;border-bottom:none;width:100%;max-width:620px;max-height:calc(100% - env(safe-area-inset-top) - 10px);display:flex;flex-direction:column;border-radius:18px 18px 0 0;animation:up .24s cubic-bezier(.32,.72,0,1);transition:transform .22s cubic-bezier(.32,.72,0,1);will-change:transform}
+.sheet.dragging{transition:none}
 @keyframes up{from{transform:translateY(100%)}to{transform:none}}
 @media(prefers-reduced-motion:reduce){.sheet,.scrim,.toast{animation:none}.chev{transition:none}}
-.grip{width:36px;height:4px;border-radius:2px;background:#39424A;margin:9px auto 0}
-.sh-h{display:flex;justify-content:space-between;gap:12px;padding:12px 18px 14px;border-bottom:1px solid #242B30}
+.drag{flex-shrink:0;cursor:grab;touch-action:none;position:sticky;top:0;z-index:2;background:#161A1D;border-radius:18px 18px 0 0}
+.grip{width:36px;height:5px;border-radius:3px;background:#39424A;margin:9px auto 0}
+.sh-h{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 16px 13px 18px;border-bottom:1px solid #242B30}
 .sh-h small{font-size:12px;color:#71797F}
 .sh-h h3{font-size:19px;margin-top:3px;letter-spacing:-.02em}
-.x{font-size:16px;color:#8B949B;padding:6px 8px;align-self:flex-start}
+.x{width:34px;height:34px;flex-shrink:0;border-radius:50%;background:#232A2F;color:#AEB7BD;display:grid;place-items:center;font-size:14px;padding:0;align-self:center}
+.x:active{background:#2E373E}
 .sh-b{padding:16px 18px;overflow-y:auto;flex:1;overscroll-behavior:contain}
 .sh-f{display:flex;gap:9px;padding:12px 18px calc(12px + env(safe-area-inset-bottom));border-top:1px solid #242B30}
 .sh-f .btn{margin-top:0}
