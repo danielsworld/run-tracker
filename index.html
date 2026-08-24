@@ -12,10 +12,10 @@
 <meta name="apple-mobile-web-app-title" content="Sub-18" />
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Crect width='180' height='180' fill='%230D1012'/%3E%3Ctext x='90' y='104' font-family='-apple-system,Arial' font-size='58' font-weight='700' fill='%236C9CF0' text-anchor='middle'%3E18%3C/text%3E%3Ctext x='90' y='140' font-family='-apple-system,Arial' font-size='22' font-weight='600' fill='%238B949B' text-anchor='middle'%3ESUB%3C/text%3E%3C/svg%3E" />
 <style>
-  html{height:100%}
-  body{margin:0;padding:0;background:#0D1012;height:100%;overflow:hidden}
-  #root{height:100%}
-  .boot{display:flex;align-items:center;justify-content:center;height:100vh;color:#71797F;
+  html{background:#0D1012}
+  body{margin:0;padding:0;background:#0D1012;min-height:100vh;min-height:100dvh}
+  #root{min-height:100vh;min-height:100dvh}
+  .boot{display:flex;align-items:center;justify-content:center;height:100vh;height:100dvh;color:#71797F;
     font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:15px}
 </style>
 </head>
@@ -306,8 +306,10 @@ const Icon = ({ n }) => {
     lift: "M4 9v6M8 7v10M16 7v10M20 9v6M8 12h8",
     mob: "M3 14c2.5-4 4.5-4 7 0s4.5 4 7 0M3 8c2.5-4 4.5-4 7 0s4.5 4 7 0",
     adj: "M4 8h10M18 8h2M4 16h4M12 16h8M15 5v6M9 13v6",
+    back: "M15 5l-7 7 7 7",
   }[n];
-  return <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={p} /></svg>;
+  const s = n === "back" ? 18 : 21;
+  return <svg viewBox="0 0 24 24" width={s} height={s} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={p} /></svg>;
 };
 
 /* ═══════════════ APP ═══════════════ */
@@ -319,13 +321,24 @@ function App() {
   const [toast, setToast] = useState(null);
   const [tab, setTab] = useState("today");
   const [editing, setEditing] = useState(null);
-  const mainRef = useRef(null);
   const fileRef = useRef(null);
   const today = todayISO();
 
   const flash = (msg, bad) => { setToast({ msg, bad }); setTimeout(() => setToast(null), 2200); };
 
-  useEffect(() => { if (mainRef.current) mainRef.current.scrollTop = 0; }, [tab]);
+  useEffect(() => { window.scrollTo(0, 0); }, [tab]);
+
+  // Freeze the page behind the log sheet, then put the reader back where they were.
+  useEffect(() => {
+    if (!editing) return;
+    const y = window.scrollY;
+    const b = document.body.style;
+    b.position = "fixed"; b.top = `-${y}px`; b.left = "0"; b.right = "0";
+    return () => {
+      b.position = ""; b.top = ""; b.left = ""; b.right = "";
+      window.scrollTo(0, y);
+    };
+  }, [editing]);
 
   const commit = useCallback((next, msg) => {
     const ok = saveState(next);
@@ -396,11 +409,19 @@ function App() {
   return (
     <div className="app">
       <header className="hdr">
-        <div><div className="hdr-t">Sub-18 · 5K</div><div className="hdr-s">Sat 3 Oct · goal 5:44–5:47/mi</div></div>
-        <div className="hdr-cd"><b>{dOut >= 0 ? dOut : "—"}</b><span>days</span></div>
+        <div className="hdr-in">
+          <button className="hdr-home" onClick={() => setTab("today")} aria-label="Back to today">
+            {tab !== "today" && <span className="hdr-b"><Icon n="back" /></span>}
+            <span>
+              <span className="hdr-t">Sub-18 · 5K</span>
+              <span className="hdr-s">{tab === "today" ? "Sat 3 Oct · goal 5:44–5:47/mi" : "Back to today"}</span>
+            </span>
+          </button>
+          <div className="hdr-cd"><b>{dOut >= 0 ? dOut : "—"}</b><span>days</span></div>
+        </div>
       </header>
 
-      <main className="main" ref={mainRef}>
+      <main className="main">
         {tab === "today" && <Today day={cur} today={today} days={days} logs={logs} onEdit={setEditing} cards={cards} go={setTab} />}
         {tab === "plan" && <Plan days={days} logs={logs} today={today} stats={stats} onEdit={setEditing} />}
         {tab === "lift" && <Strength />}
@@ -415,12 +436,14 @@ function App() {
       {toast && <div className={"toast" + (toast.bad ? " bad" : "")}>{toast.msg}</div>}
 
       <nav className="tabbar">
-        {[["today", "Today"], ["plan", "Plan"], ["lift", "Strength"], ["mob", "Mobility"], ["adj", "Adjust"]].map(([k, l]) => (
-          <button key={k} className={"tb" + (tab === k ? " on" : "")} onClick={() => setTab(k)} aria-label={l} aria-current={tab === k}>
-            <span className="tb-i"><Icon n={k} />{k === "adj" && cards.length > 0 && <i className="dot" />}</span>
-            <span className="tb-l">{l}</span>
-          </button>
-        ))}
+        <div className="tabbar-in">
+          {[["today", "Today"], ["plan", "Plan"], ["lift", "Strength"], ["mob", "Mobility"], ["adj", "Adjust"]].map(([k, l]) => (
+            <button key={k} className={"tb" + (tab === k ? " on" : "")} onClick={() => setTab(k)} aria-label={l} aria-current={tab === k}>
+              <span className="tb-i"><Icon n={k} />{k === "adj" && cards.length > 0 && <i className="dot" />}</span>
+              <span className="tb-l">{l}</span>
+            </button>
+          ))}
+        </div>
       </nav>
 
       {editing && <Sheet day={days.find((x) => x.d === editing)} existing={logs[editing]} onSave={saveLog} onDelete={delLog} onClose={() => setEditing(null)} />}
@@ -689,7 +712,7 @@ function Adjust({ cards, applied, onApply, handoff, copy, onExport, onImport, on
         ) : <button className="btn ghost sm" onClick={() => setConfirm(true)}>Clear all data</button>}
       </section>
 
-      <p className="build">Build 7 · full-height layout</p>
+      <p className="build">Build 8 · pinned nav</p>
     </React.Fragment>
   );
 }
@@ -845,17 +868,24 @@ h1,h2,h3{margin:0;font-weight:650;letter-spacing:-.01em}
 p{margin:0}a{color:inherit;text-decoration:none}
 body{color:#E6EAED;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
 .mono{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
-.app{height:100%;display:flex;flex-direction:column;overflow:hidden}
-.hdr{flex-shrink:0;display:flex;justify-content:space-between;align-items:center;padding:calc(16px + env(safe-area-inset-top)) 20px 15px;background:#14181B;border-bottom:1px solid #232A2F}
-.hdr-t{font-size:17px;font-weight:650;letter-spacing:-.02em}
-.hdr-s{font-size:12.5px;color:#8B949B;margin-top:2px}
-.hdr-cd{text-align:right;line-height:1}
+/* The page itself scrolls (no inner scroll container) so mobile browsers can
+   collapse their toolbars normally. Header sticks, tab bar is pinned. */
+.app{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column}
+.hdr{position:sticky;top:0;z-index:50;background:#14181B;border-bottom:1px solid #232A2F;padding:calc(12px + env(safe-area-inset-top)) 20px 12px}
+.hdr-in{display:flex;justify-content:space-between;align-items:center;gap:14px;max-width:620px;width:100%;margin:0 auto}
+.hdr-home{display:flex;align-items:center;gap:8px;min-width:0;padding:4px 0;margin:-4px 0;border-radius:8px}
+.hdr-home:active{opacity:.6}
+.hdr-b{display:grid;place-items:center;width:26px;height:26px;flex-shrink:0;border-radius:50%;background:#232A2F;color:#AEB7BD}
+.hdr-t{display:block;font-size:17px;font-weight:650;letter-spacing:-.02em}
+.hdr-s{display:block;font-size:12.5px;color:#8B949B;margin-top:2px}
+.hdr-cd{text-align:right;line-height:1;flex-shrink:0}
 .hdr-cd b{font-size:26px;font-weight:650;font-variant-numeric:tabular-nums;color:#6C9CF0}
 .hdr-cd span{display:block;font-size:11px;color:#8B949B;margin-top:3px}
-.main{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:14px 14px 24px;max-width:620px;width:100%;margin:0 auto}
+.main{flex:1;padding:14px 14px calc(78px + env(safe-area-inset-bottom));max-width:620px;width:100%;margin:0 auto}
 .lead{font-size:12px;color:#8B949B;margin-bottom:8px;padding-left:2px}
 .dim{color:#71797F}
-.tabbar{flex-shrink:0;display:flex;background:rgba(20,24,27,.94);backdrop-filter:blur(14px);border-top:1px solid #232A2F;padding-bottom:env(safe-area-inset-bottom)}
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:60;background:rgba(20,24,27,.94);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid #232A2F;padding-bottom:env(safe-area-inset-bottom)}
+.tabbar-in{display:flex;max-width:620px;width:100%;margin:0 auto}
 .tb{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 2px 7px;color:#767F86;transition:color .15s}
 .tb.on{color:#7DA9F5}
 .tb:active{opacity:.6}
@@ -978,7 +1008,7 @@ body{color:#E6EAED;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Robot
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(78px + env(safe-area-inset-bottom));background:#2E373E;color:#E6EAED;font-size:13.5px;font-weight:550;padding:11px 18px;border-radius:999px;z-index:70;box-shadow:0 6px 24px rgba(0,0,0,.45);animation:pop .22s ease}
 .toast.bad{background:#5C2A20;color:#F5B3A4}
 @keyframes pop{from{opacity:0;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
-.wrap{position:fixed;top:0;right:0;bottom:0;left:0;z-index:80;display:flex;align-items:flex-end;justify-content:center}
+.wrap{position:fixed;top:0;right:0;bottom:0;left:0;height:100dvh;z-index:80;display:flex;align-items:flex-end;justify-content:center}
 .scrim{position:absolute;top:0;right:0;bottom:0;left:0;background:rgba(0,0,0,.62);animation:fade .2s ease}
 @keyframes fade{from{opacity:0}to{opacity:1}}
 .sheet{position:relative;background:#161A1D;border:1px solid #242B30;border-bottom:none;width:100%;max-width:620px;max-height:calc(100% - env(safe-area-inset-top) - 10px);display:flex;flex-direction:column;border-radius:18px 18px 0 0;animation:up .24s cubic-bezier(.32,.72,0,1);transition:transform .22s cubic-bezier(.32,.72,0,1);will-change:transform}
@@ -1013,7 +1043,7 @@ body{color:#E6EAED;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Robot
 .cb.on.red{background:#C24A3E;border-color:#C24A3E}
 .cb.w{width:100%;text-align:center}
 .build{text-align:center;font-size:11px;color:#4B535A;padding:4px 0 8px}
-@media(min-width:560px){.main{padding:18px 18px 28px}.sess h2{font-size:26px}.tb-l{font-size:11px}}
+@media(min-width:560px){.main{padding:18px 18px calc(84px + env(safe-area-inset-bottom))}.sess h2{font-size:26px}.tb-l{font-size:11px}}
 `;
 
 const styleEl = document.createElement("style");
